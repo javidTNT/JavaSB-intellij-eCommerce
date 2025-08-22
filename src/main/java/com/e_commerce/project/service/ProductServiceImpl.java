@@ -2,10 +2,13 @@ package com.e_commerce.project.service;
 
 import com.e_commerce.project.exceptions.APIExceptions;
 import com.e_commerce.project.exceptions.ResourceNotFoundException;
+import com.e_commerce.project.model.Cart;
 import com.e_commerce.project.model.Category;
 import com.e_commerce.project.model.Product;
+import com.e_commerce.project.payload.CartDTO;
 import com.e_commerce.project.payload.ProductDTO;
 import com.e_commerce.project.payload.ProductResponse;
+import com.e_commerce.project.repositories.CartRepository;
 import com.e_commerce.project.repositories.CategoryRepository;
 import com.e_commerce.project.repositories.ProductRepository;
 import org.modelmapper.ModelMapper;
@@ -20,9 +23,16 @@ import org.springframework.data.domain.Sort;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductServiceImpl implements ProductService{
+
+    @Autowired
+    private CartRepository cartRepository;
+
+    @Autowired
+    private CartService cartService;
 
     @Autowired
     private ProductRepository productRepository;
@@ -159,19 +169,38 @@ public class ProductServiceImpl implements ProductService{
     }
 
     @Override
-    public ProductDTO updateProduct(ProductDTO productDTO, Long productId) {
-        Product productFromDB = productRepository.findById(productId)
+    public ProductDTO updateProduct(Long productId, ProductDTO productDTO) {
+        Product productFromDb = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "productId", productId));
-        Product product = modelMapper.map(productDTO, Product.class);
-        productFromDB.setProductName(product.getProductName());
-        productFromDB.setDescription(product.getDescription());
-        productFromDB.setQuantity(product.getQuantity());
-        productFromDB.setPrice(product.getPrice());
-        productFromDB.setDiscount(product.getDiscount());
-        productFromDB.setSpecialPrice(product.getSpecialPrice());
 
-        Product saveProduct = productRepository.save(productFromDB);
-        return modelMapper.map(saveProduct, ProductDTO.class);
+        Product product = modelMapper.map(productDTO, Product.class);
+
+        productFromDb.setProductName(product.getProductName());
+        productFromDb.setDescription(product.getDescription());
+        productFromDb.setQuantity(product.getQuantity());
+        productFromDb.setDiscount(product.getDiscount());
+        productFromDb.setPrice(product.getPrice());
+        productFromDb.setSpecialPrice(product.getSpecialPrice());
+
+        Product savedProduct = productRepository.save(productFromDb);
+
+        List<Cart> carts = cartRepository.findCartsByProductId(productId);
+
+        List<CartDTO> cartDTOs = carts.stream().map(cart -> {
+            CartDTO cartDTO = modelMapper.map(cart, CartDTO.class);
+
+            List<ProductDTO> products = cart.getCartItems().stream()
+                    .map(p -> modelMapper.map(p.getProduct(), ProductDTO.class)).collect(Collectors.toList());
+
+            cartDTO.setProducts(products);
+
+            return cartDTO;
+
+        }).toList();
+
+        cartDTOs.forEach(cart -> cartService.updateProductInCarts(cart.getCartID(), productId));
+
+        return modelMapper.map(savedProduct, ProductDTO.class);
     }
 
     @Override

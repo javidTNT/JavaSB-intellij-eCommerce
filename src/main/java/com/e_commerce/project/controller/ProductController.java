@@ -63,7 +63,7 @@ public class ProductController {
 
     @PutMapping("/admin/products/{productId}")
     public ResponseEntity<ProductDTO> updateProduct(@Valid@RequestBody ProductDTO productDTO, @PathVariable Long productId) {
-        ProductDTO updateProducDTO = productService.updateProduct(productDTO, productId);
+        ProductDTO updateProducDTO = productService.updateProduct(productId, productDTO);
         return new ResponseEntity<>(updateProducDTO,HttpStatus.OK);
     }
 
